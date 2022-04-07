@@ -35,6 +35,3 @@ where price <= (
                 from book
                 )
 order by price desc;
-
-
-#1.4-2
