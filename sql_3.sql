@@ -394,3 +394,179 @@ having count(keyword_id) >= 2
 order by Шаг;
 
 
+#3.5-4
+select Группа,
+    CASE
+        WHEN Группа = "I" THEN "от 0 до 10"
+        WHEN Группа = "II" THEN "от 11 до 15"
+        WHEN Группа = "III" THEN "от 16 до 27"
+        ELSE "больше 27"
+    END as Интервал,
+    count(rate) as Количество
+from
+(
+    SELECT student_name, rate, 
+        CASE
+            WHEN rate <= 10 THEN "I"
+            WHEN rate <= 15 THEN "II"
+            WHEN rate <= 27 THEN "III"
+            ELSE "IV"
+        END AS Группа
+    FROM      
+        (
+         SELECT student_name, count(*) as rate
+         FROM 
+             (
+              SELECT student_name, step_id
+              FROM 
+                  student 
+                  INNER JOIN step_student USING(student_id)
+              WHERE result = "correct"
+              GROUP BY student_name, step_id
+             ) query_in
+         GROUP BY student_name 
+         ORDER BY 2
+        ) query_in_1
+) a
+group by Группа;
+
+--
+select Группа,
+    CASE
+        WHEN Группа = "I" THEN "от 0 до 10"
+        WHEN Группа = "II" THEN "от 11 до 15"
+        WHEN Группа = "III" THEN "от 16 до 27"
+        ELSE "больше 27"
+    END as Интервал,
+    count(rate) as Количество
+from
+(
+    SELECT student_name, rate, 
+        CASE
+            WHEN rate <= 10 THEN "I"
+            WHEN rate <= 15 THEN "II"
+            WHEN rate <= 27 THEN "III"
+            ELSE "IV"
+        END AS Группа
+    FROM      
+        (
+         SELECT student_name, count(distinct step_id) as rate
+         FROM 
+             student 
+             INNER JOIN step_student USING(student_id)
+            WHERE result = "correct"
+            GROUP BY student_name
+            ) query_in
+) a
+group by Группа
+order by 1;
+--
+
+
+#3.5-5
+WITH get_count_correct (st_n_c, count_correct) 
+  AS (
+    SELECT step_name, count(*)
+    FROM 
+        step 
+        INNER JOIN step_student USING (step_id)
+    WHERE result = "correct"
+    GROUP BY step_name
+   ),
+  get_count_wrong (st_n_w, count_wrong) 
+  AS (
+    SELECT step_name, count(*)
+    FROM 
+        step 
+        INNER JOIN step_student USING (step_id)
+    WHERE result = "wrong"
+    GROUP BY step_name
+   )  
+SELECT st_n_c AS Шаг,
+    CASE
+    WHEN count_wrong IS NULL THEN 100
+    WHEN count_correct IS NULL THEN 0
+    ELSE ROUND(count_correct / (count_correct + count_wrong) * 100) 
+    END AS Успешность
+FROM  
+    get_count_correct 
+    LEFT JOIN get_count_wrong ON st_n_c = st_n_w
+UNION
+SELECT st_n_w AS Шаг,
+    CASE
+    WHEN count_wrong IS NULL THEN 100
+    WHEN count_correct IS NULL THEN 0
+    ELSE ROUND(count_correct / (count_correct + count_wrong) * 100) 
+    END AS Успешность
+FROM  
+    get_count_correct 
+    RIGHT JOIN get_count_wrong ON st_n_c = st_n_w
+ORDER BY 2, 1;
+
+
+#3.5-6
+SET @max_progress = (SELECT COUNT(DISTINCT step_id) FROM step_student);
+
+with get_progress (student_name, progress) 
+  as (
+    select student_name,
+    ROUND((count(distinct step_id) / @max_progress) * 100) as progress
+    from student join step_student using(student_id)
+    where result = 'correct'
+    group by student_name
+    )
+select student_name as Студент,
+progress as Прогресс,
+case
+    when progress = 100 then "Сертификат с отличием"
+    when progress >= 80 then "Сертификат"
+    else ""
+end as Результат
+from get_progress
+order by 2 desc, 1 asc;
+
+
+#3.5-7
+select student_name as Студент,
+    concat(substring(step_name, 1, 20), "...") as Шаг,
+    result as Результат,
+    FROM_UNIXTIME(submission_time) as Дата_отправки,
+    SEC_TO_TIME(submission_time - lag(submission_time, 1, submission_time)
+               OVER (ORDER BY submission_time))
+               as Разница
+from step_student
+join student using(student_id)
+join step using(step_id)
+where student_name = "student_61"
+order by 4;
+
+
+#3.5-8
+with get_avg_time (lesson_id, avg_time)
+as
+(
+    select lesson_id,
+        round(avg(lesson_time / (60 * 60) ), 2) as avg_time
+    from
+    (
+        select student_id,
+            lesson_id,
+            sum(submission_time - attempt_time) as lesson_time
+        from step_student
+        join step s using(step_id)
+        where submission_time - attempt_time < 4 * 60 * 60 
+        group by student_id, lesson_id
+    ) a
+    group by lesson_id
+)
+select
+    rank() over (order by avg_time) as Номер,
+    concat(m.module_id, ".", l.lesson_position, " ", l.lesson_name) as Урок,
+    avg_time as Среднее_время
+from module m
+join lesson l using(module_id)
+join get_avg_time using(lesson_id)
+order by 3;
+
+
+#3.5-9
