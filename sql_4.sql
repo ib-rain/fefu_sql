@@ -117,4 +117,211 @@ where order_amount = (
 );
 
 
-#4.2-3
+#4.2-3	
+set @avg_amount = (
+    select avg(amount) as avg_amount
+    from
+    (
+        select amount from book
+        union all
+        select amount from supply
+    ) q1
+);
+
+create table store as
+	select title,
+		author,
+		max_price as price,
+		sum_amount as amount
+	from 
+	(
+		select title,
+			author,
+			max(price) as max_price,
+			sum(amount) as sum_amount
+		from 
+	    (
+	        select title, author, price, amount from book
+	        union all
+	        select title, author, price, amount from supply
+	    ) q2
+	    group by title, author
+	) q3
+	where sum_amount > @avg_amount
+	order by 2, 3 desc;
+
+select * from store;
+
+
+#4.2-4
+select author,
+	title,
+	if(price <500, 'низкая', if(price < 700, 'средняя', 'высокая')) as price_category,
+	price * amount as cost
+from book
+where author not like '%Есенин%' and
+	title not like '%Белая гвардия%'
+order by 4 desc, 2 asc;
+
+
+#4.2-5
+set @max_cost = (select max(price * amount) from book);
+
+select title,
+	author,
+	amount,
+	round(@max_cost - price * amount, 2) as Разница_с_макс_стоимостью
+from book
+where amount % 2 = 1
+order by 4 desc;
+
+
+#4.2-6
+select title as Наименование,
+	price as Цена,
+	if(amount <= 5, 500, 'Бесплатно') as Стоимость_доставки
+from book
+where price > 600
+order by 2 desc;
+
+
+#4.2-7
+select author,
+	title,
+	amount,
+	price,
+	if(amount >= 5, '50%', if(price >= 700, '20%', '10%')) as Скидка,
+	round(if(amount >= 5, 0.5, if(price >= 700, 0.8, 0.9)) * price, 2) Цена_со_скидкой
+from book
+order by 1;
+
+
+#4.2-8
+select author,
+	title,
+	amount,
+	price as real_price,
+	round(if(amount * price > 5000, 1.2, 0.8) * price, 2) as new_price,
+	if(price <= 500, 99.99, if(amount < 5, 149.99, 0)) as delivery_price
+from book
+where (author like '%Есенин%'
+    or author like '%Булгаков%')
+	and (amount between 3 and 14)
+order by 1 asc, 2 desc, 6 asc;
+
+
+#4.3-1
+select author,
+	title,
+	price div 1 as Рубли,
+	round(100 * (price % 1), 0) as Копейки
+from book
+order by 4 desc;
+
+
+#4.3-2
+select concat('Графоман и ', author) as Автор,
+	concat(title, '. Краткое содержание.') as Название,
+	if(0.4 * price < 250, 0.4 * price, 250) as Цена,
+	if(amount <= 3, 'высокий', if(amount <= 10, 'средний', 'низкий')) as Спрос,
+	if(amount <= 2, 'очень мало', if(amount <= 14, 'в наличии', 'много')) as Наличие
+from book
+order by 3, amount, title;
+
+
+#4.3-3
+with get_joined as
+(
+	select name_client,
+		sum(book.price * b_b.amount) as total_sum,
+		count(distinct b.buy_id) as total_count,
+		sum(b_b.amount) as book_amount
+	from client c
+	join buy b using(client_id)
+	join buy_book b_b using(buy_id)
+	join book using(book_id)
+	group by name_client
+)
+
+select name_client,
+	total_sum as Общая_сумма_заказов,
+	total_count as Заказов_всего,
+	book_amount as Книг_всего
+from get_joined
+where total_sum > (
+	select avg(total_sum) from get_joined
+)
+order by 1;
+
+
+###
+#4 SQL window function examples
+#https://www.youtube.com/watch?v=XBE09l-UYTE
+
+#https://platform.stratascratch.com/coding/10302-distance-per-dollar?code_type=3
+select request_date,
+    DATE_FORMAT(request_date, '%Y-%m'),
+    round(abs(distance_to_travel / monetary_cost - avg(distance_to_travel / monetary_cost) over (partition by DATE_FORMAT(request_date, '%Y-%m'))), 2) as abs_av_diff
+from uber_request_logs
+order by request_date;
+
+
+#https://platform.stratascratch.com/coding/9898-unique-salaries?utm_source=youtube&utm_medium=click&utm_campaign=YT+description+link&code_type=1
+select department,
+    salary,
+    salary_rank
+from
+(
+    select department,
+        salary,
+        rank() over (partition by department order by salary desc) as salary_rank
+    from
+    (
+        select department, salary
+        from twitter_employee
+        group by department, salary
+        order by department, salary
+    ) a
+) b
+where salary_rank <= 3
+order by 1, 2 desc;
+
+
+#https://platform.stratascratch.com/coding/10303-top-percentile-fraud?code_type=1
+select policy_num,
+    state,
+    claim_cost,
+    fraud_score
+from
+(
+    select *,
+        ntile(100) over (partition by state order by fraud_score desc) as percentile
+    from fraud_score
+) q
+where percentile <= 5;
+
+
+#https://platform.stratascratch.com/coding/9637-growth-of-airbnb?code_type=3
+select y,
+    hosts_count as cur_hosts,
+    prev_hosts_count as prev_hosts,
+    100 * round((hosts_count - prev_hosts_count) / prev_hosts_count, 2) as rate_of_growth
+from
+(
+    select y,
+        hosts_count,
+        lag(hosts_count, 1) over (order by y) as prev_hosts_count
+    from
+    (
+        select DATE_FORMAT(host_since, '%Y') as y,
+            count(id) as hosts_count
+        from airbnb_search_details
+        group by DATE_FORMAT(host_since, '%Y')
+    ) q1
+) q2
+order by 1;
+
+###
+
+
+#4.3-4
