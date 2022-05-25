@@ -255,3 +255,103 @@ order by 1;
 
 
 #4.3-4
+set @sum_income = (select sum(price * amount) from book);
+
+select author,
+    title,
+    price,
+    amount,
+    round(100 * (price * amount) / @sum_income, 2) as income_percent
+from book
+order by 5 desc;
+
+
+#4.3-5
+select name_author,
+	name_genre
+	count(book_id) as Количество
+from author
+join book using(author_id)
+join genre using(genre_id)
+group by name_author, name_genre
+order by 1, 3 desc, 2;
+
+
+#4.3-6
+with get_author_genres
+as
+(
+    select name_author,
+        name_genre,
+        author_id,
+        genre_id
+    from genre
+    cross join author
+)
+
+select name_author,
+    name_genre,
+    count(book_id) as Количество
+from get_author_genres
+left join book using(author_id, genre_id)
+group by name_author, name_genre
+order by 1, 3 desc, 2;
+
+
+#4.3-7
+select author as Автор,
+	title as Название_книги,
+	price as Цена,
+	case
+		when price <= 600 then 'ручка'
+		when price <= 700 then 'детская раскраска'
+		else 'гороскоп'
+	end as Подарок
+from book
+where price >= 500
+order by 1, 2;
+
+
+#4.3-8
+select author as Автор,
+    min(amount) as Наименьшее_кол_во,
+    max(amount) as Наибольшее_кол_во
+from book
+group by author
+having sum(amount) < 10;
+
+
+#4.3-9
+select buy_book_id,
+    buy_id,
+    book_id,
+    amount
+from buy_book
+order by 1, 2, 3, 4;
+
+set @baranov_dostoevsky_buy_id = (
+	select buy_id
+	from buy_book
+    join buy using(buy_id)
+    join client using(client_id)
+    join book using(book_id)
+    join author using(author_id)
+	where name_client like 'Баранов Павел'
+        and name_author like '%Достоевский%'
+);
+
+insert into buy_book(buy_id, book_id, amount)
+select @baranov_dostoevsky_buy_id as buy_id,
+	book_id,
+	1 as amount
+from book
+join author using(author_id)
+where name_author like '%Достоевский%';
+
+select buy_book_id,
+    buy_id,
+    book_id,
+    amount
+from buy_book
+order by 1, 2, 3, 4;
+
