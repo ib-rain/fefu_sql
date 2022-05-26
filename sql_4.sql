@@ -355,3 +355,42 @@ select buy_book_id,
 from buy_book
 order by 1, 2, 3, 4;
 
+
+#4.5-1
+with get_success
+as
+(
+    select name_subject,
+        name_question,
+        round(100 * sum(is_correct) / count(attempt_id), 2) as success
+    from question
+        inner join subject using(subject_id)
+        inner join answer using(question_id)
+        inner join testing using(answer_id)
+    group by name_subject, name_question
+)
+
+select name_subject,
+    name_question,
+    if(success = (select max(success) from get_success), 'самый легкий', 'самый сложный') as Сложность
+from get_success
+where success in (
+    (select max(success) from get_success), (select min(success) from get_success)
+)
+order by 3;
+
+
+#4.5-2
+select * from attempt;
+
+insert into attempt(student_id, subject_id, date_attempt)
+select student_id,
+	subject_id,
+    curdate()   
+from attempt
+group by student_id, subject_id
+having count(attempt_id) < 3
+	and max(result) < 70;
+    
+select * from attempt;
+
