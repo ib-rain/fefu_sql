@@ -91,24 +91,31 @@ from
 group by popularity_rating
 
 
--- https://platform.stratascratch.com/coding/9738-business-inspection-scores?code_type=3
+-- https://platform.stratascratch.com/coding/9738-business-inspection-scores?code_type=1
 select type,
-    avg(inspection_score) as avg_insp_score
+    avg(inspection_score) as avg_insp_score,
+    count(inspection_score) as inspection_count
 from
 (
     select inspection_score,
         case
-            when business_name like '%Restaurant%' then 'Restaurant'
-            when business_name like '%Cafe%' then 'Cafe'
-            when business_name like '%Taqueria%' then 'Taqueria'
-            when business_name like '%Kitchen%' then 'Kitchen'
-            when business_name like '%Garden%' then 'Garden'
-            when business_name like '%School%' then 'School'
-            else 'Other'
+            when business_name like '%restaurant%' then 'restaurant'
+            when business_name like '%cafe%' then 'cafe'
+            when business_name like '%taqueria%' then 'taqueria'
+            when business_name like '%kitchen%' then 'kitchen'
+            when business_name like '%garden%' then 'garden'
+            when business_name like '%school%' then 'school'
+            else 'other'
         end as type
-    from sf_restaurant_health_violations
-) q1
+    from
+    (
+        select inspection_score,
+            lower(business_name) as business_name
+        from sf_restaurant_health_violations
+    ) q1
+) q2
 group by type
+
 
 -- https://platform.stratascratch.com/coding/10289-top-engagements?code_type=3
 # DIRTY CASE-WHEN ONE-LINER 
